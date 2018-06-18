@@ -113,7 +113,7 @@ func (dh *DidiHooker) hookGasstation(resp *http.Response, ctx *goproxy.ProxyCtx)
 	dh.lastCity = rsp.CityName
 
 	dh.dataMtx.Lock()
-	if err := rsp.updateToFile(dh.dataDir); err != nil {
+	if err := rsp.updateToFile(dh.cityDataDir()); err != nil {
 		log.Error("update gasstation data failed:%v", err)
 	}
 	dh.dataMtx.Unlock()
@@ -351,12 +351,12 @@ type Store struct {
 	Price    string  `json:"price"`
 }
 
-func (rsp *ListGasstationRsp) cityDataDir(dir string) string {
-	return filepath.Join(dir, rsp.CityName)
-}
+// func (rsp *ListGasstationRsp) cityDataDir(dir string) string {
+// 	return filepath.Join(dir, rsp.CityName)
+// }
 
 func (rsp *ListGasstationRsp) updateToFile(dir string) error {
-	dir = rsp.cityDataDir(dir)
+	// dir = rsp.cityDataDir(dir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
