@@ -39,8 +39,15 @@ func main() {
 				cli.StringFlag{
 					Name:  "dir, d",
 					Usage: "data directory",
+					Value: "./data",
+				},
+				cli.StringFlag{
+					Name:  "city, c",
+					Usage: "city name",
+					Value: "成都市",
 				},
 			},
+			Action: analysisCity,
 		},
 	}
 	err := app.Run(os.Args)
