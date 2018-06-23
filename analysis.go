@@ -21,8 +21,10 @@ func analysisCity(c *cli.Context) error {
 	if _, err := os.Lstat(analylizer.cityDataDir); err != nil {
 		return errors.New("未找到城市数据")
 	}
-	analylizer.analysisCurrentOrder()
-	analylizer.analysisRepurchase()
+	modelCount := analylizer.analysisCurrentOrder()
+	modelScore := analylizer.analysisRepurchase()
+	topn := c.Int("top")
+	analylizer.Output(modelCount, modelScore, topn)
 	return nil
 }
 
@@ -43,7 +45,7 @@ type CarModelCount struct {
 	Count int
 }
 
-func (ca *CityAnalyzer) analysisCurrentOrder() {
+func (ca *CityAnalyzer) analysisCurrentOrder() map[string]int {
 	currentOrderDir := filepath.Join(ca.cityDataDir, "currentorder")
 
 	modelCount := map[string]int{}
@@ -67,31 +69,7 @@ func (ca *CityAnalyzer) analysisCurrentOrder() {
 		return nil
 	})
 
-	carModelCountList := []CarModelCount{}
-	for model, count := range modelCount {
-		carModelCountList = append(carModelCountList, CarModelCount{
-			Model: model,
-			Count: count,
-		})
-	}
-
-	sort.Slice(carModelCountList, func(i, j int) bool { return carModelCountList[i].Count > carModelCountList[j].Count })
-
-	log.Notice("car rank:")
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"排名", "车型", "实时订单数"})
-	for i, mc := range carModelCountList {
-		if i >= 20 {
-			break
-		}
-		table.Append([]string{
-			fmt.Sprint(i + 1),
-			mc.Model,
-			fmt.Sprint(mc.Count),
-		})
-	}
-
-	table.Render()
+	return modelCount
 
 }
 
@@ -100,7 +78,7 @@ type CarModelScore struct {
 	Score int
 }
 
-func (ca *CityAnalyzer) analysisRepurchase() {
+func (ca *CityAnalyzer) analysisRepurchase() map[string]int {
 	repurchaseDir := filepath.Join(ca.cityDataDir, "repurchase")
 
 	modelScore := map[string]int{}
@@ -124,6 +102,36 @@ func (ca *CityAnalyzer) analysisRepurchase() {
 		return nil
 	})
 
+	return modelScore
+}
+
+func (ca *CityAnalyzer) Output(modelCount, modelScore map[string]int, topn int) {
+
+	carModelCountList := []CarModelCount{}
+	for model, count := range modelCount {
+		carModelCountList = append(carModelCountList, CarModelCount{
+			Model: model,
+			Count: count,
+		})
+	}
+
+	sort.Slice(carModelCountList, func(i, j int) bool { return carModelCountList[i].Count > carModelCountList[j].Count })
+
+	log.Notice("\n车型订单数量排名:")
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"排名", "车型", "实时订单数"})
+	for i, mc := range carModelCountList {
+		if i >= topn {
+			break
+		}
+		table.Append([]string{
+			fmt.Sprint(i + 1),
+			mc.Model,
+			fmt.Sprint(mc.Count),
+		})
+	}
+	table.Render()
+
 	carModelScoreList := []CarModelScore{}
 	for model, score := range modelScore {
 		carModelScoreList = append(carModelScoreList, CarModelScore{
@@ -134,19 +142,25 @@ func (ca *CityAnalyzer) analysisRepurchase() {
 
 	sort.Slice(carModelScoreList, func(i, j int) bool { return carModelScoreList[i].Score > carModelScoreList[j].Score })
 
-	log.Notice("car score rank:")
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"排名", "车型", "加油积分"})
+	log.Notice("\n车型加油积分排名:")
+	table = tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"排名", "车型", "加油积分", "平均积分"})
 	for i, ms := range carModelScoreList {
-		if i >= 20 {
+		if i >= topn {
 			break
+		}
+		avgScore := ""
+		if count, found := modelCount[ms.Model]; found && count != 0 {
+			avgScore = fmt.Sprintf("%.02f", float64(ms.Score)/float64(count))
+		} else {
+			avgScore = "N/A"
 		}
 		table.Append([]string{
 			fmt.Sprint(i + 1),
 			ms.Model,
 			fmt.Sprint(ms.Score),
+			avgScore,
 		})
 	}
 	table.Render()
-
 }

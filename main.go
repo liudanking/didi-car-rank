@@ -46,6 +46,11 @@ func main() {
 					Usage: "city name",
 					Value: "成都市",
 				},
+				cli.IntFlag{
+					Name:  "top, t",
+					Usage: "output top n",
+					Value: 20,
+				},
 			},
 			Action: analysisCity,
 		},
