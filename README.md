@@ -95,6 +95,6 @@ didi-car-rank collect_data -d data
 
 ## 其他
 
-[data](https://github.com/liudanking/didi-car-rank/data) 目录中预置了北上广深、杭州、成都的数据。如果你只是想看一下分析结果，可以直接用这些数据执行 `didi-car-rank analysis -d data -city 成都市 -top 20`.
+[data](https://github.com/liudanking/didi-car-rank/tree/master/data) 目录中预置了北上广深、杭州、成都的数据。如果你只是想看一下分析结果，可以直接用这些数据执行 `didi-car-rank analysis -d data -city 成都市 -top 20`.
 
 如果你收集了其他城市的数据，我们也欢迎你把数据PR过来。
