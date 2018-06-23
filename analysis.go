@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,9 @@ func analysisCity(c *cli.Context) error {
 	dir := c.String("dir")
 	city := c.String("city")
 	analylizer := NewCityAnalyzer(dir, city)
+	if _, err := os.Lstat(analylizer.cityDataDir); err != nil {
+		return errors.New("未找到城市数据")
+	}
 	analylizer.analysisCurrentOrder()
 	analylizer.analysisRepurchase()
 	return nil
@@ -38,12 +42,6 @@ type CarModelCount struct {
 	Model string
 	Count int
 }
-
-// type CarModelCountList []CarModelCount
-
-// func (a CarModelCountList) Len() int           { return len(a) }
-// func (a CarModelCountList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-// func (a CarModelCountList) Less(i, j int) bool { return a[i].Count < a[j].Count }
 
 func (ca *CityAnalyzer) analysisCurrentOrder() {
 	currentOrderDir := filepath.Join(ca.cityDataDir, "currentorder")
@@ -81,13 +79,13 @@ func (ca *CityAnalyzer) analysisCurrentOrder() {
 
 	log.Notice("car rank:")
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"#", "车型", "实时订单数量"})
+	table.SetHeader([]string{"排名", "车型", "实时订单数"})
 	for i, mc := range carModelCountList {
-		if i > 20 {
+		if i >= 20 {
 			break
 		}
 		table.Append([]string{
-			fmt.Sprint(i),
+			fmt.Sprint(i + 1),
 			mc.Model,
 			fmt.Sprint(mc.Count),
 		})
@@ -138,13 +136,13 @@ func (ca *CityAnalyzer) analysisRepurchase() {
 
 	log.Notice("car score rank:")
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"#", "车型", "加油积分"})
+	table.SetHeader([]string{"排名", "车型", "加油积分"})
 	for i, ms := range carModelScoreList {
-		if i > 20 {
+		if i >= 20 {
 			break
 		}
 		table.Append([]string{
-			fmt.Sprint(i),
+			fmt.Sprint(i + 1),
 			ms.Model,
 			fmt.Sprint(ms.Score),
 		})

@@ -38,25 +38,21 @@ func collectData(c *cli.Context) error {
 	dh.RegisterHook(proxy)
 
 	log.Info("start serving %s", listenAddr)
-	// go func() {
 	if err := http.ListenAndServe(listenAddr, proxy); err != nil {
 		log.Error("listen %s failed:%v", listenAddr, err)
 		os.Exit(1)
 	}
-	// }()
 	return nil
 }
 
 type DidiHooker struct {
-	dataMtx  sync.Mutex
-	dataDir  string
-	lastCity string
+	dataMtx sync.Mutex
+	dataDir string
 }
 
 func NewDidiHooker(dataDir string) *DidiHooker {
 	return &DidiHooker{
-		dataDir:  dataDir,
-		lastCity: "未知",
+		dataDir: dataDir,
 	}
 }
 
@@ -110,18 +106,18 @@ func (dh *DidiHooker) hookGasstation(resp *http.Response, ctx *goproxy.ProxyCtx)
 		log.Error("unmarshal [%s] failed:%v", gasstationStr, err)
 		return resp
 	}
-	dh.lastCity = rsp.CityName
+
+	lng, lat := ctx.Req.URL.Query().Get("lng"), ctx.Req.URL.Query().Get("lat")
+	city := GetCityByPosition(lng, lat)
 
 	dh.dataMtx.Lock()
-	if err := rsp.updateToFile(dh.cityDataDir()); err != nil {
+	if err := rsp.updateToFile(dh.cityDataDir(city)); err != nil {
 		log.Error("update gasstation data failed:%v", err)
 	}
 	dh.dataMtx.Unlock()
 
 	go func() {
-		dh.dataMtx.Lock()
-		defer dh.dataMtx.Unlock()
-		dh.doCollectData(rsp.StoreForMap, rsp.AmChannel)
+		dh.doCollectData(city, rsp.StoreForMap, rsp.AmChannel)
 	}()
 
 	return resp
@@ -160,23 +156,22 @@ func (dh *DidiHooker) hookNearStore(resp *http.Response, ctx *goproxy.ProxyCtx) 
 		return resp
 	}
 
-	// TODO: get city by lat,long
+	lng, lat := ctx.Req.URL.Query().Get("lng"), ctx.Req.URL.Query().Get("lat")
+	city := GetCityByPosition(lng, lat)
 	go func() {
-		dh.dataMtx.Lock()
-		defer dh.dataMtx.Unlock()
-		dh.doCollectData(rsp.Data.StoreForMap, 10001)
+		dh.doCollectData(city, rsp.Data.StoreForMap, 10001)
 	}()
 
 	return resp
 
 }
 
-func (dh *DidiHooker) cityDataDir() string {
-	return filepath.Join(dh.dataDir, dh.lastCity)
+func (dh *DidiHooker) cityDataDir(city string) string {
+	return filepath.Join(dh.dataDir, city)
 }
 
-func (dh *DidiHooker) doCollectData(stores []Store, amChannel int) {
-	dir := dh.cityDataDir()
+func (dh *DidiHooker) doCollectData(city string, stores []Store, amChannel int) {
+	dir := dh.cityDataDir(city)
 	currentOrderDir := filepath.Join(dir, "currentorder")
 	repurchaseDir := filepath.Join(dir, "repurchase")
 	os.MkdirAll(currentOrderDir, 0700)
@@ -206,13 +201,15 @@ func (dh *DidiHooker) doCollectData(stores []Store, amChannel int) {
 			v[item.ID] = item
 		}
 
+		dh.dataMtx.Lock()
 		if err := jsonMarshalIndentToFile(fn, &v); err != nil {
 			log.Warning("write json data to %s failed:%v", err)
 		}
+		dh.dataMtx.Unlock()
 
 	}
 	files, _ := ioutil.ReadDir(currentOrderDir)
-	log.Info("saved %d store currentorder data", len(files))
+	log.Info("saved %d store currentorder data for %s", len(files), city)
 
 	// repurchase
 	for _, store := range stores {
@@ -238,13 +235,15 @@ func (dh *DidiHooker) doCollectData(stores []Store, amChannel int) {
 			v[item.DriverID] = item
 		}
 
+		dh.dataMtx.Lock()
 		if err := jsonMarshalIndentToFile(fn, &v); err != nil {
 			log.Warning("write json data to %s failed:%v", err)
 		}
+		dh.dataMtx.Unlock()
 
 	}
 	files, _ = ioutil.ReadDir(repurchaseDir)
-	log.Info("saved %d store repurchase data", len(files))
+	log.Info("saved %d store repurchase data for %s", len(files), city)
 }
 
 type ListGasstationRsp struct {
@@ -351,12 +350,7 @@ type Store struct {
 	Price    string  `json:"price"`
 }
 
-// func (rsp *ListGasstationRsp) cityDataDir(dir string) string {
-// 	return filepath.Join(dir, rsp.CityName)
-// }
-
 func (rsp *ListGasstationRsp) updateToFile(dir string) error {
-	// dir = rsp.cityDataDir(dir)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
@@ -460,75 +454,3 @@ func (store Store) GetRepurchaseDriver(amChannel int) (*RepurchaseDriverRsp, err
 
 	return rsp, nil
 }
-
-// func (rsp *ListGasstationRsp) doCollectData(dataDir string) {
-// 	dir := rsp.cityDataDir(dataDir)
-// 	currentOrderDir := filepath.Join(dir, "currentorder")
-// 	repurchaseDir := filepath.Join(dir, "repurchase")
-// 	os.MkdirAll(currentOrderDir, 0700)
-// 	os.MkdirAll(repurchaseDir, 0700)
-
-// 	// current order
-// 	for _, store := range rsp.StoreForMap {
-// 		fn := filepath.Join(currentOrderDir, fmt.Sprintf("%s.json", store.StoreID))
-// 		fi, err := os.Lstat(fn)
-// 		v := map[string]CurrentOrderItem{}
-// 		if err == nil {
-// 			if time.Since(fi.ModTime()) < 5*time.Second {
-// 				continue
-// 			} else {
-// 				if err := encodingutil.UnmarshalJSONFromFile(fn, &v); err != nil {
-// 					log.Warning("unmarshal from file %s failed:%v", err)
-// 				}
-// 			}
-// 		}
-
-// 		currentOrderRsp, err := store.GetCurrentOrder(rsp.AmChannel)
-// 		if err != nil {
-// 			log.Warning("get [store_id:%s] current order failed:%v", store.StoreID, err)
-// 			continue
-// 		}
-// 		for _, item := range currentOrderRsp.Data.Items {
-// 			v[item.ID] = item
-// 		}
-
-// 		if err := jsonMarshalIndentToFile(fn, &v); err != nil {
-// 			log.Warning("write json data to %s failed:%v", err)
-// 		}
-
-// 		files, _ := ioutil.ReadDir(currentOrderDir)
-// 	}
-// 	log.Info("saved %d store currentorder data", len(files))
-
-// 	// repurchase
-// 	for _, store := range rsp.StoreForMap {
-// 		fn := filepath.Join(repurchaseDir, fmt.Sprintf("%s.json", store.StoreID))
-// 		fi, err := os.Lstat(fn)
-// 		v := map[string]RepurchaseItem{}
-// 		if err == nil {
-// 			if time.Since(fi.ModTime()) < 5*time.Second {
-// 				continue
-// 			} else {
-// 				if err := encodingutil.UnmarshalJSONFromFile(fn, &v); err != nil {
-// 					log.Warning("unmarshal from file %s failed:%v", err)
-// 				}
-// 			}
-// 		}
-
-// 		repurchaseDriverRsp, err := store.GetRepurchaseDriver(rsp.AmChannel)
-// 		if err != nil {
-// 			log.Warning("get [store_id:%s] current order failed:%v", store.StoreID, err)
-// 			continue
-// 		}
-// 		for _, item := range repurchaseDriverRsp.Data.Items {
-// 			v[item.DriverID] = item
-// 		}
-
-// 		if err := jsonMarshalIndentToFile(fn, &v); err != nil {
-// 			log.Warning("write json data to %s failed:%v", err)
-// 		}
-
-// 		files, _ := ioutil.ReadDir(repurchaseDir)
-// 	}
-// 	log.Info("saved %d store repurchase data", len(files))
-// }
