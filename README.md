@@ -26,10 +26,10 @@ didi-car-rank collect_data -d data
 ```
 
 
-* 在手机上安装并信任[CA证书](https://github.com/liudanking/didi-car-rank/cert/cert.pem)
+* 在手机上安装并信任[CA证书](https://github.com/liudanking/didi-car-rank/blob/master/cert/cert.pem)
 * 设置手机代理，iPhone为例：`设置->无线局域网->小叹号->配置代理->手动`:
 
-![](https://ws1.sinaimg.cn/mw690/44cd29dagy1fsl6c3jgwtj20yi1pcdmm.jpg)
+<img src="https://ws1.sinaimg.cn/mw690/44cd29dagy1fsl6c3jgwtj20yi1pcdmm.jpg" width='320' />
 
 * 手机上打开 `滴滴车主 APP `, 找到`滴滴加油`，点进去，然后随便移动一下位置。对于一个城市来说，基本两分钟就把滴滴加油站滑完，数据也就采集得超不多了。
 * 在电脑上运行 `didi-car-rank analysis -d data -city 成都市 -top 20`, 查看滴滴司机心中的神车有哪些：
