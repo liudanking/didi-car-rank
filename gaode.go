@@ -11,7 +11,7 @@ import (
 
 const (
 	// Oops, for temporary usage
-	GaodeKey = "64b4b2d0050ae7a675ec7b2cd2a5976c"
+	GaodeKey = "YOUR_KEY"
 )
 
 type RegeoRsp struct {
